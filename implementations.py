@@ -1,4 +1,7 @@
-import timeit, time, gc, itertools, shlex, getopt, ast, traceback, sys, math
+import timeit, time, gc, itertools, shlex, getopt, ast, traceback, sys, math, pstats
+import cProfile as profile
+from pathlib import Path
+from io import StringIO
 #Below check copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/utils/timing.py#L23-L67
 try:
     import resource
@@ -68,6 +71,67 @@ def _format_time(timespan, precision=3):
     else:
         order = 3
     return u"%.*g %s" % (precision, timespan * scaling[order], units[order])
+
+#Below function has content copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L305-L379
+def _run_with_profiler(code, opts, namespace):
+        opts = dict(opts)
+        prof = profile.Profile()
+        try:
+            prof = prof.runctx(code, namespace, namespace)
+            sys_exit = ''
+        except SystemExit:
+            sys_exit = """*** SystemExit exception caught in code being profiled."""
+        
+        stats = pstats.Stats(prof).strip_dirs().sort_stats(*opts.get('s', ['time']))
+        
+        lims = opts.get('l', [])
+        if lims:
+            lims_ = []  # rebuild lims with ints/floats/strings
+            for lim in lims:
+                try:
+                    lims_.append(int(lim))
+                except ValueError:
+                    try:
+                        lims_.append(float(lim))
+                    except ValueError:
+                        lims_.append(lim)
+        
+        # Trap output.
+        stdout_trap = StringIO()
+        stats_stream = stats.stream
+        try:
+            stats.stream = stdout_trap
+            stats.print_stats(*lims_)
+        finally:
+            stats.stream = stats_stream
+        
+        output = stdout_trap.getvalue()
+        output = output.rstrip()
+        
+        if 'q' not in opts:
+            page.page(output)
+        print(sys_exit, end=' ')
+        
+        dump_file = opts.D[0]
+        text_file = opts.T[0]
+        if dump_file:
+            prof.dump_stats(dump_file)
+            print(
+                f"\n*** Profile stats marshalled to file {repr(dump_file)}.{sys_exit}"
+            )
+        if text_file:
+            pfile = Path(text_file)
+            pfile.touch(exist_ok=True)
+            pfile.write_text(output)
+
+            print(
+                f"\n*** Profile printout saved to text file {repr(text_file)}.{sys_exit}"
+            )
+        
+        if 'r' in opts:
+            return stats
+        
+        return None
 
 #Below class copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L60-L110
 class TimeitResult(object):
@@ -169,6 +233,11 @@ class Timer(timeit.Timer):
             if gcold:
                 gc.enable()
         return timing
+
+#Implementation of %prun
+def magic_prun(parameter_s=''):
+    opts, arg_str = getopt.getopt(parameter_s, 'D:l:rs:T:q')
+    return _run_with_profiler(arg_str, opts, globals())
 
 #Implementation of %timeit
 def magic_timeit(line='', local_ns=None):
