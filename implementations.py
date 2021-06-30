@@ -1,12 +1,46 @@
 import timeit, time, gc, itertools, shlex, getopt, ast, traceback, sys, math
+#Below check copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/utils/timing.py#L23-L67
 try:
     import resource
+    def clocku():
+        """clocku() -> floating point number
+        Return the *USER* CPU time in seconds since the start of the process.
+        This is done via a call to resource.getrusage, so it avoids the
+        wraparound problems in time.clock()."""
+
+        return resource.getrusage(resource.RUSAGE_SELF)[0]
+
+    def clocks():
+        """clocks() -> floating point number
+        Return the *SYSTEM* CPU time in seconds since the start of the process.
+        This is done via a call to resource.getrusage, so it avoids the
+        wraparound problems in time.clock()."""
+
+        return resource.getrusage(resource.RUSAGE_SELF)[1]
+
     def clock():
+        """clock() -> floating point number
+        Return the *TOTAL USER+SYSTEM* CPU time in seconds since the start of
+        the process.  This is done via a call to resource.getrusage, so it
+        avoids the wraparound problems in time.clock()."""
+
         u,s = resource.getrusage(resource.RUSAGE_SELF)[:2]
         return u+s
-except ImportError:
-    clock = time.perf_counter
 
+    def clock2():
+        """clock2() -> (t_user,t_system)
+        Similar to clock(), but return a tuple of user/system times."""
+        return resource.getrusage(resource.RUSAGE_SELF)[:2]
+except ImportError:
+    # There is no distinction of user/system time under windows, so we just use
+    # time.perff_counter() for everything...
+    clocku = clocks = clock = time.perf_counter
+    def clock2():
+        """Under windows, system CPU time can't be measured.
+        This just returns perf_counter() and zero."""
+        return time.perf_counter(),0.0
+
+#Below function copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L1466-L1503
 def _format_time(timespan, precision=3):
     if timespan >= 60.0:
         parts = [("d", 60*60*24),("h", 60*60),("min", 60), ("s", 1)]
@@ -35,6 +69,7 @@ def _format_time(timespan, precision=3):
         order = 3
     return u"%.*g %s" % (precision, timespan * scaling[order], units[order])
 
+#Below class copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L60-L110
 class TimeitResult(object):
     """
     Object returned by the timeit magic with info about the run.
@@ -84,6 +119,7 @@ class TimeitResult(object):
                     std = _format_time(self.stdev, self._precision))
                 )
 
+#Below class copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L117-L139
 class TimeitTemplateFiller(ast.NodeTransformer):
     """Fill in the AST template for timing execution.
     This is quite closely tied to the template definition, which is in
@@ -107,6 +143,7 @@ class TimeitTemplateFiller(ast.NodeTransformer):
             node.body = self.ast_stmt.body
         return node
 
+#Below class copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L142-L167
 class Timer(timeit.Timer):
     """Timer class that explicitly uses self.inner
     
@@ -133,8 +170,12 @@ class Timer(timeit.Timer):
                 gc.enable()
         return timing
 
-def magic_timeit(totime, local_ns=None):
-    opts, stmt = getopt.getopt(shlex.split(totime), 'n:r:s:tcp:qo')
+#Implementation of %timeit
+def magic_timeit(line='', local_ns=None):
+    opts, stmt = getopt.getopt(shlex.split(line), 'n:r:s:tcp:qo')
+    if not stmt:
+        return
+    
     timefunc = timeit.default_timer
     setupstmt = '\n'.join([x[1] for x in opts if x[0] == '-s'])
     stmt = '\n'.join(stmt)
@@ -213,4 +254,72 @@ def magic_timeit(totime, local_ns=None):
                 print("Compiler time: {:.2f} s".format(tc))
         if return_result:
             return timeit_result
+
+#Below check copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L46-L52
+if sys.version_info > (3,8):
+    from ast import Module
+else :
+    # mock the new API, ignore second argument
+    # see https://github.com/ipython/ipython/issues/11590
+    from ast import Module as OriginalModule
+    Module = lambda nodelist, type_ignores: OriginalModule(nodelist)
+
+#Implementation of %time
+def magic_time(line='', local_ns=None):
+    tp_min = 0.1
+    t0 = clock()
+    expr_ast = ast.parse(line)
+    tp = clock()-t0
+    expr_ast = ast.fix_missing_locations(expr_ast)
+    tc_min = 0.1
+    expr_val = None
+    if len(expr_ast.body)==1 and isinstance(expr_ast.body[0], ast.Expr):
+        mode = 'eval'
+        source = '<timed eval>'
+        expr_ast = ast.Expression(expr_ast.body[0].value)
+    else:
+        mode = 'exec'
+        source = '<timed exec>'
+        if len(expr_ast.body) > 1 and isinstance(expr_ast.body[-1], ast.Expr):
+            expr_val = expr_ast.body[-1]
+            expr_ast = expr_ast.body[:-1]
+            expr_ast = Module(expr_ast, [])
+    
+    t0 = clock()
+    code = compile(expr_ast, source, mode)
+    tc = clock()-t0
+    glob = globals()
+    wtime = time.time
+    wall_st = wtime()
+    if mode == 'eval':
+        st = clock2()
+        try:
+            exec(code, glob, local_ns)
+            out = None
+            if expr_val is not None:
+                code_2 = compile(expr_val, source, 'eval')
+                out = eval(code_2, glob, local_ns)
+        except:
+            traceback.print_exc()
+            return
+        
+        end = clock2()
+    
+    wall_end = wtime()
+    wall_time = wall_end-wall_st
+    cpu_user = end[0]-st[0]
+    cpu_sys = end[1]-st[1]
+    cpu_tot = cpu_user+cpu_sys
+    if sys.platform != 'win32':
+        print("CPU times: user {}, sys {}, total {}" \
+                  .format(_format_time(cpu_user), _format_time(cpu_sys), _format_time(cpu_tot)))
+    
+    print("Wall time: {}".format(_format_time(wall_time)))
+    if tc > tc_min:
+        print("Compiler : {}".format(_format_time(tc)))
+    
+    if tp > tp_min:
+        print("Parser   : {}".format(_format_time(tp)))
+    
+    return out
 
