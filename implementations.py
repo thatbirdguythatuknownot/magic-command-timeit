@@ -10,26 +10,26 @@ try:
         Return the *USER* CPU time in seconds since the start of the process.
         This is done via a call to resource.getrusage, so it avoids the
         wraparound problems in time.clock()."""
-
+        
         return resource.getrusage(resource.RUSAGE_SELF)[0]
-
+    
     def clocks():
         """clocks() -> floating point number
         Return the *SYSTEM* CPU time in seconds since the start of the process.
         This is done via a call to resource.getrusage, so it avoids the
         wraparound problems in time.clock()."""
-
+        
         return resource.getrusage(resource.RUSAGE_SELF)[1]
-
+    
     def clock():
         """clock() -> floating point number
         Return the *TOTAL USER+SYSTEM* CPU time in seconds since the start of
         the process.  This is done via a call to resource.getrusage, so it
         avoids the wraparound problems in time.clock()."""
-
+        
         u,s = resource.getrusage(resource.RUSAGE_SELF)[:2]
         return u+s
-
+    
     def clock2():
         """clock2() -> (t_user,t_system)
         Similar to clock(), but return a tuple of user/system times."""
