@@ -5,7 +5,7 @@ from shutil import get_terminal_size as _get_terminal_size
 StringIO = io.StringIO
 
 esc_re = re.compile(r"(\x1b[^m]+m)")
-#Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/core/page.py#L324-L345
+#Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L324-L345
 if os.name == 'nt' and os.environ.get('TERM','dumb') != 'emacs':
     import msvcrt
     def page_more():
@@ -28,7 +28,7 @@ else:
         else:
             return True
 
-#Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/utils/timing.py#L23-L67
+#Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/timing.py#L23-L67
 try:
     import resource
     def clocku():
@@ -69,7 +69,7 @@ except ImportError:
         This just returns perf_counter() and zero."""
         return time.perf_counter(),0.0
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/core/page.py#L81-L124
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L81-L124
 def _detect_screen_size(screen_lines_def):
     """Attempt to work out the number of lines on the screen.
     This is called by page(). It can raise an error (e.g. when run in the
@@ -99,7 +99,7 @@ def _detect_screen_size(screen_lines_def):
     except termios.error as err:
         # can fail on Linux 2.6, pager_page will catch the TypeError
         raise TypeError('termios error: {0}'.format(err)) from err
-
+    
     try:
         scr = curses.initscr()
     except AttributeError:
@@ -108,7 +108,7 @@ def _detect_screen_size(screen_lines_def):
     
     screen_lines_real,screen_cols = scr.getmaxyx()
     curses.endwin()
-
+    
     # Restore terminal state in case endwin() didn't.
     termios.tcsetattr(sys.stdout,termios.TCSANOW,term_flags)
     # Now we have what we needed: the screen size in rows/columns
@@ -143,12 +143,12 @@ def _format_time(timespan, precision=3):
         order = 3
     return u"%.*g %s" % (precision, timespan * scaling[order], units[order])
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/utils/data.py#L26-L28
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/data.py#L26-L28
 def chop(seq, size):
     """Chop a sequence into chunks of the given size."""
     return [seq[i:i+size] for i in range(0,len(seq),size)]
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/core/page.py#L285-L304
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L285-L304
 def get_pager_cmd(pager_cmd=None):
     """Return a pager command.
     Makes some attempts at finding an OS-correct one.
@@ -169,7 +169,7 @@ def get_pager_cmd(pager_cmd=None):
     
     return pager_cmd
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/core/page.py#L307-L320
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L307-L320
 def get_pager_start(pager, start):
     """Return the string for paging files with an offset.
     This is the '+N' argument which less and more (under Unix) accept.
@@ -184,11 +184,11 @@ def get_pager_start(pager, start):
         start_string = ''
     return start_string
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/utils/terminal.py#L128-L129
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/terminal.py#L128-L129
 def get_terminal_size(defaultx=80, defaulty=25):
     return _get_terminal_size((defaultx, defaulty))
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/core/page.py#L57-L79
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L57-L79
 def page_dumb(strng, start=0, screen_lines=25):
     """Very dumb 'pager' in Python, for when nothing else works.
     Only moves forward, same interface as page(), except for pager_cmd and
@@ -212,7 +212,7 @@ def page_dumb(strng, start=0, screen_lines=25):
                 last_escape = esc_list[-1]
         print(last_escape + os.linesep.join(screens[-1]))
 
-#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/a2c2a2dcec36224c7dca561efcf9ed9e5c514c3c/IPython/core/page.py#L128-L236
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L128-L236
 def page(strng, start=0, screen_lines=0, pager_cmd=None):
     """Display a string, piping through a pager after a certain length.
     
@@ -480,7 +480,7 @@ class Timer(timeit.Timer):
                 gc.enable()
         return timing
 
-#Implementation of %prun
+#Implementation of %prun from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L184-L303
 def magic_prun(parameter_s=''):
     opts, arg_str = getopt.getopt(shlex.split(parameter_s), 'D:l:rs:T:q')
     arg_str = '\n'.join(arg_str)
@@ -494,7 +494,7 @@ def magic_prun(parameter_s=''):
     opts = optdict
     return _run_with_profiler(arg_str, opts, globals())
 
-#Implementation of %timeit
+#Implementation of %timeit from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L1002-L1189
 def magic_timeit(line='', local_ns=None):
     opts, stmt = getopt.getopt(shlex.split(line), 'n:r:s:tcp:qo')
     if not stmt:
@@ -579,7 +579,7 @@ def magic_timeit(line='', local_ns=None):
         if return_result:
             return timeit_result
 
-#Below check copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L46-L52
+#Below check copied completely from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L46-L52
 if sys.version_info > (3,8):
     from ast import Module
 else :
@@ -588,7 +588,7 @@ else :
     from ast import Module as OriginalModule
     Module = lambda nodelist, type_ignores: OriginalModule(nodelist)
 
-#Implementation of %time
+#Implementation of %time from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L1195-L1338
 def magic_time(line='', local_ns=None):
     tp_min = 0.1
     t0 = clock()
