@@ -15,8 +15,7 @@ setup(
     license="AGPL-3.0",
     classifiers=[
         "License :: OSI Approved :: GNU Affero General Public License version 3",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10"
+        "Programming Language :: Python :: 3"
     ],
     packages=["magiccmds"],
     include_package_data=True
