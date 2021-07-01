@@ -369,7 +369,7 @@ def _run_with_profiler(code, opts, namespace):
             pfile = Path(text_file)
             pfile.touch(exist_ok=True)
             pfile.write_text(output)
-
+            
             print(
                 f"\n*** Profile printout saved to text file {repr(text_file)}.{sys_exit}"
             )
