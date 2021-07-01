@@ -483,6 +483,7 @@ class Timer(timeit.Timer):
 #Implementation of %prun
 def magic_prun(parameter_s=''):
     opts, arg_str = getopt.getopt(shlex.split(parameter_s), 'D:l:rs:T:q')
+    arg_str = '\n'.join(arg_str)
     optdict = {}
     for key, value in opts:
         if key in optdict:
