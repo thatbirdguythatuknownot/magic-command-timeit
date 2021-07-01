@@ -86,22 +86,22 @@ def _run_with_profiler(code, opts, namespace):
         
         lims = opts.get('l', [])
         if lims:
-            lims_ = []  # rebuild lims with ints/floats/strings
-            for lim in lims:
+            lims, lims_ = [], lims  # rebuild lims with ints/floats/strings
+            for lim in lims_:
                 try:
-                    lims_.append(int(lim))
+                    lims.append(int(lim))
                 except ValueError:
                     try:
-                        lims_.append(float(lim))
+                        lims.append(float(lim))
                     except ValueError:
-                        lims_.append(lim)
+                        lims.append(lim)
         
         # Trap output.
         stdout_trap = StringIO()
         stats_stream = stats.stream
         try:
             stats.stream = stdout_trap
-            stats.print_stats(*lims_)
+            stats.print_stats(*lims)
         finally:
             stats.stream = stats_stream
         
