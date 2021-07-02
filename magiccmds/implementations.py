@@ -487,7 +487,7 @@ def magic_prun(parameter_s=''):
     Usage:
     magiccmds.prun("[option] <stmt-string or expression>")
     """
-    opts, arg_str = getopt.getopt(shlex.split(parameter_s), 'D:l:rs:T:q')
+    opts, arg_str = getopt.getopt(shlex.split(parameter_s, posix=False), 'D:l:rs:T:q')
     arg_str = '\n'.join(arg_str)
     optdict = {}
     for key, value in opts:
@@ -508,7 +508,7 @@ def magic_timeit(line='', local_ns=None):
     Usage:
     magiccmds.timeit("[option] (-s <setup-string or expression>)* <stmt-string or expression>", namespace)
     """
-    opts, stmt = getopt.getopt(shlex.split(line), 'n:r:s:tcp:qo')
+    opts, stmt = getopt.getopt(shlex.split(line, posix=False), 'n:r:s:tcp:qo')
     if not stmt:
         return
     
