@@ -5,12 +5,12 @@ HERE = Path(__file__).parent
 README = (HERE/"README.md").read_text()
 setup(
     name="magic-commands",
-    version="0.0.13.1",
+    version="0.0.13.1-1",
     description="IPython magic commands, now available in pure Python",
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/thatbirdguythatuknownot/magic-commands",
-    download_url="https://github.com/thatbirdguythatuknownot/magic-commands/archive/refs/tags/v0.0.13.1.zip",
+    download_url="https://github.com/thatbirdguythatuknownot/magic-commands/archive/refs/tags/v0.0.13.1-1.zip",
     author="Crowthebird",
     author_email="nohackingofkrowten@gmail.com",
     license="AGPL-3.0",
