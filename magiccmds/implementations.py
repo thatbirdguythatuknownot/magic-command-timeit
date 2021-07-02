@@ -482,6 +482,10 @@ class Timer(timeit.Timer):
 
 #Implementation of %prun from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L184-L303
 def magic_prun(parameter_s=''):
+    """
+    Usage:
+    magiccmds.prun("[option] <stmt-string or expression>")
+    """
     opts, arg_str = getopt.getopt(shlex.split(parameter_s), 'D:l:rs:T:q')
     arg_str = '\n'.join(arg_str)
     optdict = {}
@@ -496,6 +500,10 @@ def magic_prun(parameter_s=''):
 
 #Implementation of %timeit from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L1002-L1189
 def magic_timeit(line='', local_ns=None):
+    """
+    Usage:
+    magiccmds.timeit("[option] (-s <setup-string or expression>)* <stmt-string or expression>")
+    """
     opts, stmt = getopt.getopt(shlex.split(line), 'n:r:s:tcp:qo')
     if not stmt:
         return
@@ -590,6 +598,10 @@ else :
 
 #Implementation of %time from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L1195-L1338
 def magic_time(line='', local_ns=None):
+    """
+    Usage:
+    magiccmds.timeit("<stmt-string or expression>")
+    """
     tp_min = 0.1
     t0 = clock()
     expr_ast = ast.parse(line)
