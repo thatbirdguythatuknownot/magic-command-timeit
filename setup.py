@@ -5,7 +5,7 @@ HERE = Path(__file__).parent
 README = (HERE/"README.md").read_text()
 setup(
     name="magic-commands",
-    version="0.0.10",
+    version="0.0.12",
     description="IPython magic commands, now available in pure Python",
     long_description=README,
     long_description_content_type="text/markdown",
