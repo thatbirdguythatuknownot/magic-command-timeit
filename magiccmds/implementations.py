@@ -1,6 +1,7 @@
 import timeit, time, gc, itertools, shlex, getopt, ast, traceback, sys, math, pstats, re, os, io, tempfile
 import cProfile as profile
 from pathlib import Path
+from inspect import stack
 from shutil import get_terminal_size as _get_terminal_size
 StringIO = io.StringIO
 
@@ -498,29 +499,32 @@ def magic_prun(parameter_s=''):
     opts = optdict
     return _run_with_profiler(arg_str, opts, globals())
 
+default_timert = timeit.default_timer
+default_repeatt = timeit.default_repeat
+timet = time.time
 #Implementation of %timeit from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L1002-L1189
 def magic_timeit(line='', local_ns=None):
     """
     Usage:
-    magiccmds.timeit("[option] (-s <setup-string or expression>)* <stmt-string or expression>")
+    magiccmds.timeit("[option] (-s <setup-string or expression>)* <stmt-string or expression>", namespace)
     """
     opts, stmt = getopt.getopt(shlex.split(line), 'n:r:s:tcp:qo')
     if not stmt:
         return
     
-    timefunc = timeit.default_timer
+    timefunc = default_timert
     setupstmt = '\n'.join([x[1] for x in opts if x[0] == '-s'])
     stmt = '\n'.join(stmt)
     opts = dict(opts)
     number = int(opts.get("-n", 0))
-    default_repeat = 7 if timeit.default_repeat < 7 else timeit.default_repeat
+    default_repeat = 7 if default_repeatt < 7 else default_repeatt
     repeat = int(opts.get("-r", default_repeat))
     precision = int(opts.get("-p", 3))
     quiet, return_result = '-q' in opts, '-o' in opts
     if '-c' in opts:
         timefunc = clock
     elif 't' in opts:
-        timefunc = time.time
+        timefunc = timet
     
     timer = Timer(timer=timefunc)
     valid = True
@@ -551,7 +555,7 @@ def magic_timeit(line='', local_ns=None):
         code = compile(timeit_ast, "<timeit-magic>", "exec")
         tc = clock()-t0
         ns = {}
-        glob = globals()
+        glob = (thestuff=stack()[0][1]).f_globals|thestuff.f_locals
         conflict_globs = {}
         if local_ns:
             for var_name, var_val in glob.items():
@@ -600,7 +604,7 @@ else :
 def magic_time(line='', local_ns=None):
     """
     Usage:
-    magiccmds.timeit("<stmt-string or expression>")
+    magiccmds.timeit("<stmt-string or expression>", namespace)
     """
     tp_min = 0.1
     t0 = clock()
@@ -624,8 +628,8 @@ def magic_time(line='', local_ns=None):
     t0 = clock()
     code = compile(expr_ast, source, mode)
     tc = clock()-t0
-    glob = globals()
-    wtime = time.time
+    glob = (thestuff=stack()[0][1]).f_globals|thestuff.f_locals
+    wtime = timet
     wall_st = wtime()
     if mode == 'eval':
         st = clock2()
