@@ -15,7 +15,7 @@ setup(
     author_email="nohackingofkrowten@gmail.com",
     license="AGPL-3.0",
     classifiers=[
-        "License :: OSI Approved :: GNU Affero General Public License version 3",
+        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Programming Language :: Python :: 3"
     ],
     packages=["magiccmds"],
