@@ -555,7 +555,7 @@ def magic_timeit(line='', local_ns=None):
         code = compile(timeit_ast, "<timeit-magic>", "exec")
         tc = clock()-t0
         ns = {}
-        glob = (thestuff=stack()[0][1]).f_globals|thestuff.f_locals
+        glob = (thestuff:=stack()[0][1]).f_globals|thestuff.f_locals
         conflict_globs = {}
         if local_ns:
             for var_name, var_val in glob.items():
@@ -628,7 +628,7 @@ def magic_time(line='', local_ns=None):
     t0 = clock()
     code = compile(expr_ast, source, mode)
     tc = clock()-t0
-    glob = (thestuff=stack()[0][1]).f_globals|thestuff.f_locals
+    glob = (thestuff:=stack()[0][1]).f_globals|thestuff.f_locals
     wtime = timet
     wall_st = wtime()
     if mode == 'eval':
