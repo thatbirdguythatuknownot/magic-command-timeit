@@ -1,9 +1,17 @@
-import timeit, time, gc, itertools, shlex, getopt, ast, traceback, sys, math, pstats, re, os, io, tempfile
+import timeit, time, gc, itertools, shlex, getopt, ast, traceback, sys, math, pstats, re, os, io, tempfile, ctypes, locale, warnings, re
 import cProfile as profile
 from pathlib import Path
+from ctypes import c_int, POINTER
+from ctypes.wintypes import LPCWSTR, HLOCAL
 from inspect import stack
 from shutil import get_terminal_size as _get_terminal_size
 StringIO = io.StringIO
+
+class CoreError(Exception):
+    pass
+
+class UsageError(CoreError):
+    pass
 
 esc_re = re.compile(r"(\x1b[^m]+m)")
 #Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L324-L345
@@ -28,6 +36,126 @@ else:
             return False
         else:
             return True
+
+#Below class and next two assignments completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/inputtransformer2.py#L50-L114
+class PromptStripper:
+    """Remove matching input prompts from a block of input.
+    Parameters
+    ----------
+    prompt_re : regular expression
+        A regular expression matching any input prompt (including continuation,
+        e.g. ``...``)
+    initial_re : regular expression, optional
+        A regular expression matching only the initial prompt, but not continuation.
+        If no initial expression is given, prompt_re will be used everywhere.
+        Used mainly for plain Python prompts (``>>>``), where the continuation prompt
+        ``...`` is a valid Python expression in Python 3, so shouldn't be stripped.
+    Notes
+    -----
+    If initial_re and prompt_re differ,
+    only initial_re will be tested against the first line.
+    If any prompt is found on the first two lines,
+    prompts will be stripped from the rest of the block.
+    """
+    def __init__(self, prompt_re, initial_re=None):
+        self.prompt_re = prompt_re
+        self.initial_re = initial_re or prompt_re
+    
+    def _strip(self, lines):
+        return [self.prompt_re.sub('', l, count=1) for l in lines]
+    
+    def __call__(self, lines):
+        if not lines:
+            return lines
+        if self.initial_re.match(lines[0]) or \
+                (len(lines) > 1 and self.prompt_re.match(lines[1])):
+            return self._strip(lines)
+        return lines
+
+classic_prompt = PromptStripper(
+    prompt_re=re.compile(r'^(>>>|\.\.\.)( |$)'),
+    initial_re=re.compile(r'^>>>( |$)')
+)
+
+ipython_prompt = PromptStripper(
+    re.compile(
+        r"""
+        ^(                         # Match from the beginning of a line, either:
+                                   # 1. First-line prompt:
+        ((\[nav\]|\[ins\])?\ )?    # Vi editing mode prompt, if it's there
+        In\                        # The 'In' of the prompt, with a space
+        \[\d+\]:                   # Command index, as displayed in the prompt
+        \                          # With a mandatory trailing space
+        |                          # ... or ...
+                                   # 2. The three dots of the multiline prompt
+        \s*                        # All leading whitespace characters
+        \.{3,}:                    # The three (or more) dots
+        \ ?                        # With an optional trailing space
+        )
+        """,
+        re.VERBOSE,
+    )
+)
+
+#Below two functions and assigning of DEFAULT_ENCODING variable completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/encoding.py#L21-L71
+def get_stream_enc(stream, default=None):
+    """Return the given stream's encoding or a default.
+    There are cases where ``sys.std*`` might not actually be a stream, so
+    check for the encoding attribute prior to returning it, and return
+    a default if it doesn't exist or evaluates as False. ``default``
+    is None if not provided.
+    """
+    if not hasattr(stream, 'encoding') or not stream.encoding:
+        return default
+    else:
+        return stream.encoding
+
+# Less conservative replacement for sys.getdefaultencoding, that will try
+# to match the environment.
+# Defined here as central function, so if we find better choices, we
+# won't need to make changes all over IPython.
+def getdefaultencoding(prefer_stream=True):
+    """Return IPython's guess for the default encoding for bytes as text.
+    If prefer_stream is True (default), asks for stdin.encoding first,
+    to match the calling Terminal, but that is often None for subprocesses.
+    Then fall back on locale.getpreferredencoding(),
+    which should be a sensible platform default (that respects LANG environment),
+    and finally to sys.getdefaultencoding() which is the most conservative option,
+    and usually UTF8 as of Python 3.
+    """
+    enc = None
+    if prefer_stream:
+        enc = get_stream_enc(sys.stdin)
+    if not enc or enc=='ascii':
+        try:
+            # There are reports of getpreferredencoding raising errors
+            # in some cases, which may well be fixed, but let's be conservative here.
+            enc = locale.getpreferredencoding()
+        except Exception:
+            pass
+    enc = enc or sys.getdefaultencoding()
+    # On windows `cp0` can be returned to indicate that there is no code page.
+    # Since cp0 is an invalid encoding return instead cp1252 which is the
+    # Western European default.
+    if enc == 'cp0':
+        warnings.warn(
+            "Invalid code page cp0 detected - using cp1252 instead."
+            "If cp1252 is incorrect please ensure a valid code page "
+            "is defined for the process.", RuntimeWarning)
+        return 'cp1252'
+    return enc
+
+DEFAULT_ENCODING = getdefaultencoding()
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/py3compat.py#L17-L19
+def decode(s, encoding=None):
+    encoding = encoding or DEFAULT_ENCODING
+    return s.decode(encoding, "replace")
+
+#Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/py3compat.py#L26-L29
+def cast_unicode(s, encoding=None):
+    if isinstance(s, bytes):
+        return decode(s, encoding)
+    return s
 
 #Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/timing.py#L23-L67
 try:
@@ -69,6 +197,36 @@ except ImportError:
         """Under windows, system CPU time can't be measured.
         This just returns perf_counter() and zero."""
         return time.perf_counter(),0.0
+
+#Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/utils/_process_win32.py#L171-L200
+try:
+    CommandLineToArgvW = ctypes.windll.shell32.CommandLineToArgvW
+    CommandLineToArgvW.arg_types = [LPCWSTR, POINTER(c_int)]
+    CommandLineToArgvW.restype = POINTER(LPCWSTR)
+    LocalFree = ctypes.windll.kernel32.LocalFree
+    LocalFree.res_type = HLOCAL
+    LocalFree.arg_types = [HLOCAL]
+    
+    def arg_split(commandline, posix=False, strict=True):
+        """Split a command line's arguments in a shell-like manner.
+        This is a special version for windows that use a ctypes call to CommandLineToArgvW
+        to do the argv splitting. The posix parameter is ignored.
+        If strict=False, process_common.arg_split(...strict=False) is used instead.
+        """
+        #CommandLineToArgvW returns path to executable if called with empty string.
+        if commandline.strip() == "":
+            return []
+        if not strict:
+            # not really a cl-arg, fallback on _process_common
+            return py_arg_split(commandline, posix=posix, strict=strict)
+        argvn = c_int()
+        result_pointer = CommandLineToArgvW(py3compat.cast_unicode(commandline.lstrip()), ctypes.byref(argvn))
+        result_array_type = LPCWSTR * argvn.value
+        result = [arg for arg in result_array_type.from_address(ctypes.addressof(result_pointer.contents))]
+        retval = LocalFree(result_pointer)
+        return result
+except AttributeError:
+    arg_split = py_arg_split
 
 #Below function completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L81-L124
 def _detect_screen_size(screen_lines_def):
@@ -481,13 +639,96 @@ class Timer(timeit.Timer):
                 gc.enable()
         return timing
 
+#Below function copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/magic.py#L575-L668
+def parse_options(self, arg_str, opt_str, *long_opts, **kw):
+        """Parse options passed to an argument string.
+        The interface is similar to that of getopt.getopt, but it
+        returns a dictionary with the options as keys
+        and the stripped argument string still as a string.
+        arg_str is quoted as a true sys.argv vector by using shlex.split.
+        This allows us to easily expand variables, glob files, quote
+        arguments, etc.
+        Parameters
+        ----------
+        arg_str : str
+          The arguments to parse.
+        opt_str : str
+          The options specification.
+        mode : str, default 'string'
+          If given as 'list', the argument string is returned as a list (split
+          on whitespace) instead of a string.
+        list_all : bool, default False
+          Put all option values in lists. Normally only options
+          appearing more than once are put in a list.
+        posix : bool, default True
+          Whether to split the input line in POSIX mode or not, as per the
+          conventions outlined in the :mod:`shlex` module from the standard
+          library.
+        """
+        
+        mode = kw.get('mode','string')
+        if mode not in ['string','list']:
+            raise ValueError('incorrect mode given: %s' % mode)
+        # Get options
+        list_all = kw.get('list_all',0)
+        posix = kw.get('posix', os.name == 'posix')
+        strict = kw.get('strict', True)
+        
+        preserve_non_opts = kw.get("preserve_non_opts", False)
+        remainder_arg_str = arg_str
+        
+        # Check if we have more than one argument to warrant extra processing:
+        odict = {}  # Dictionary with options
+        args = arg_str.split()
+        if len(args) >= 1:
+            # If the list of inputs only has 0 or 1 thing in it, there's no
+            # need to look for options
+            argv = arg_split(arg_str, posix, strict)
+            # Do regular option processing
+            try:
+                opts,args = getopt.getopt(argv, opt_str, long_opts)
+            except GetoptError as e:
+                raise UsageError(
+                    '%s ( allowed: "%s" %s)' % (e.msg, opt_str, " ".join(long_opts))
+                ) from e
+            for o, a in opts:
+                if mode == "string" and preserve_non_opts:
+                    # remove option-parts from the original args-string and preserve remaining-part.
+                    # This relies on the arg_split(...) and getopt(...)'s impl spec, that the parsed options are
+                    # returned in the original order.
+                    remainder_arg_str = remainder_arg_str.replace(o, "", 1).replace(
+                        a, "", 1
+                    )
+                if o.startswith("--"):
+                    o = o[2:]
+                else:
+                    o = o[1:]
+                try:
+                    odict[o].append(a)
+                except AttributeError:
+                    odict[o] = [odict[o],a]
+                except KeyError:
+                    if list_all:
+                        odict[o] = [a]
+                    else:
+                        odict[o] = a
+        
+        # Prepare opts,args for return
+        if mode == 'string':
+            if preserve_non_opts:
+                args = remainder_arg_str.lstrip()
+            else:
+                args = " ".join(args)
+        
+        return odict,args
+
 #Implementation of %prun from https://github.com/ipython/ipython/blob/master/IPython/core/magics/execution.py#L184-L303
 def magic_prun(parameter_s=''):
     """
     Usage:
     magiccmds.prun("[option] <stmt-string or expression>")
     """
-    opts, arg_str = getopt.getopt(shlex.split(parameter_s, posix=False), 'D:l:rs:T:q')
+    opts, arg_str = parse_options(parameter_s, 'D:l:rs:T:q')
     arg_str = '\n'.join(arg_str)
     optdict = {}
     for key, value in opts:
@@ -508,7 +749,7 @@ def magic_timeit(line='', local_ns=None):
     Usage:
     magiccmds.timeit("[option] (-s <setup-string or expression>)* <stmt-string or expression>", namespace)
     """
-    opts, stmt = getopt.getopt(shlex.split(line, posix=False), 'n:r:s:tcp:qo')
+    opts, stmt = parse_options(line, 'n:r:s:tcp:qo')
     if not stmt:
         return
     
