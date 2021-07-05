@@ -5,13 +5,23 @@ from ctypes import c_int, POINTER
 from ctypes.wintypes import LPCWSTR, HLOCAL
 from inspect import stack
 from shutil import get_terminal_size as _get_terminal_size
+from .compclass import CachingCompiler as compile_class
 StringIO = io.StringIO
 
 class CoreError(Exception):
     pass
 
 class UsageError(CoreError):
-    pass
+    """Error in magic function arguments, etc.
+    Something that probably won't warrant a full traceback, but should
+    nevertheless interrupt a macro / batch file.
+    """
+
+class InputRejected(Exception):
+    """Input rejected by ast transformer.
+    Raise this in your NodeTransformer to indicate that InteractiveShell should
+    not execute the supplied input.
+    """
 
 esc_re = re.compile(r"(\x1b[^m]+m)")
 #Below check completely copied from IPython source code, https://github.com/ipython/ipython/blob/master/IPython/core/page.py#L324-L345
